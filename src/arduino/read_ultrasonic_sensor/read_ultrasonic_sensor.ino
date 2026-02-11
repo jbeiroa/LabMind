@@ -12,7 +12,7 @@ float readUltrasonicDistance(int triggerPin, int echoPin) {
   digitalWrite(triggerPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(triggerPin, LOW);
-  return 0.01723 * pulseIn(echoPin, HIGH);
+  return 0.01723 * pulseIn(echoPin, HIGH, 30000);
 }
 
 void setup() {
@@ -20,7 +20,7 @@ void setup() {
   pinMode(trigger, OUTPUT);
   pinMode(echo, INPUT);
   digitalWrite(controlPin, HIGH);
-  Serial.begin(9600);
+  Serial.begin(115200);
   delay(2000);
   digitalWrite(controlPin, LOW);
 }
@@ -46,4 +46,3 @@ void loop() {
     Serial.println(distance);
   }
 }
-
