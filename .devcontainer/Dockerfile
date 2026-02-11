@@ -7,7 +7,8 @@ RUN echo "Acquire::http::Pipeline-Depth 0;" > /etc/apt/apt.conf.d/99custom && \
     echo "Acquire::http::No-Cache true;" >> /etc/apt/apt.conf.d/99custom && \
     echo "Acquire::BrokenProxy    true;" >> /etc/apt/apt.conf.d/99custom
 
-RUN apt update
+RUN rm -f /etc/apt/sources.list.d/yarn.list \
+    && apt update
 
 # Install a native toolchain and common build dependencies
 RUN export DEBIAN_FRONTEND=noninteractive && \

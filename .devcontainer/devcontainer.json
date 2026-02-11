@@ -7,7 +7,7 @@
         5000, 8080, 8324, 8334
     ],
     "hostRequirements": {
-        "memory": "8gb"
+        "memory": "6gb"
     },
     "containerEnv": {
         "MLFLOW_TRACKING_URI": "http://127.0.0.1:5000",
@@ -32,15 +32,6 @@
                 "ms-toolsai.jupyter",
                 "charliermarsh.ruff"
             ]
-        }
-    },
-    "features": {
-        "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-            "moby": true,
-            "installDockerBuildx": true,
-            "installDockerComposeSwitch": true,
-            "version": "latest",
-            "dockerDashComposeVersion": "none"
         }
     }
 }
