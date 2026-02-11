@@ -1378,6 +1378,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pyserial" },
     { name = "pytest" },
+    { name = "requests" },
     { name = "scipy" },
 ]
 
@@ -1392,6 +1393,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pytest", specifier = ">=9.0.2" },
+    { name = "requests", specifier = ">=2.32.5" },
     { name = "scipy", specifier = ">=1.17.0" },
 ]
 
