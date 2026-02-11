@@ -1,0 +1,11 @@
+set shell := ["zsh", "-cu"]
+
+ingest-serial:
+  PYTHONPATH=src \
+  LABMIND_INGEST_URL="${LABMIND_INGEST_URL:-http://localhost:8002/reading}" \
+  LABMIND_INGEST_TIMEOUT_S="${LABMIND_INGEST_TIMEOUT_S:-2}" \
+  LABMIND_BATCH_SIZE="${LABMIND_BATCH_SIZE:-25}" \
+  LABMIND_BATCH_FLUSH_S="${LABMIND_BATCH_FLUSH_S:-0.2}" \
+  LABMIND_SERIAL_BAUD="${LABMIND_SERIAL_BAUD:-115200}" \
+  LABMIND_LOOP_DURATION_S="${LABMIND_LOOP_DURATION_S:-5}" \
+  uv run python src/ingestion/serial_reader.py
