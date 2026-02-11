@@ -4,7 +4,7 @@
         "dockerfile": "Dockerfile"
     },
     "forwardPorts": [
-        5000, 8080, 8324, 8334
+        5000, 8001, 8002, 8080, 8324, 8334
     ],
     "hostRequirements": {
         "memory": "6gb"
