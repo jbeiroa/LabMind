@@ -208,3 +208,6 @@ __marimo__/
 
 # MacOS pesky DS_Store
 .DS_Store
+
+# data directory
+data/
