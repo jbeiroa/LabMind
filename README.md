@@ -349,6 +349,92 @@ labmind/
 
 ---
 
+## 10.1 Ingestion Implementation (Current)
+
+The current ingestion path has three components:
+
+1. **Ingestion API** (`/src/api/ingestion_api.py`)
+* Receives single readings (`POST /reading`) or batches (`POST /readings`).
+* Persists raw rows as JSONL.
+* Supports per-run target file override through header `X-Raw-Data-File`.
+
+2. **Serial Reader** (`/src/ingestion/serial_reader.py`)
+* Reads Arduino measurements from serial.
+* Sends readings in batches to ingestion API.
+* Can route writes to a specific raw file via env var `LABMIND_RAW_DATA_FILE`.
+
+3. **Metaflow Ingestion Flow** (`/src/flows/ingestion.py`)
+* `source_mode=live`: launches serial reader subprocess, validates data, builds dataframe.
+* `source_mode=file`: reads `jsonl/csv/parquet`, validates data, builds dataframe.
+* Optionally writes parquet and exposes flow artifacts for downstream flows.
+
+### Just Commands
+
+Start ingestion API service:
+
+```bash
+just ingestion-api
+```
+
+Optional API overrides:
+
+```bash
+RAW_DATA_DIR=data/raw/custom INGESTION_API_PORT=8002 just ingestion-api
+```
+
+Run live ingestion flow (default behavior: keep raw JSONL and save parquet):
+
+```bash
+just ingest-serial
+```
+
+Run live ingestion flow without raw JSONL persistence:
+
+```bash
+PERSIST_RAW_JSONL=false just ingest-serial
+```
+
+Run live ingestion flow without parquet persistence:
+
+```bash
+SAVE_PARQUET=false just ingest-serial
+```
+
+Run live ingestion flow without raw JSONL and without parquet:
+
+```bash
+PERSIST_RAW_JSONL=false SAVE_PARQUET=false just ingest-serial
+```
+
+Run serial capture directly (without running Metaflow flow):
+
+```bash
+just serial-capture
+```
+
+### Storage Behavior
+
+Raw JSONL:
+
+* Default API file: `data/raw/readings.jsonl`
+* Run-specific file (flow live mode with `persist_raw_jsonl=true`):  
+  `data/raw/experiment_id=<id>/trial_id=<id>/sensor_id=<id>/date=<yyyy-mm-dd>/raw-<run_id>.jsonl`
+* If `persist_raw_jsonl=false`, flow writes to a temporary file in `data/raw/.tmp/` and removes it after validation.
+
+Parquet:
+
+* If `save_parquet=true`, parquet is written to:  
+  `data/raw/experiment_id=<id>/trial_id=<id>/sensor_id=<id>/date=<yyyy-mm-dd>/part-<run_id>.parquet`
+* If `save_parquet=false`, no parquet is written.
+
+### Why Both JSONL and Parquet Exist
+
+* JSONL is the immutable raw event stream from online capture.
+* Parquet is the validated, analysis-friendly snapshot produced by the flow.
+* You can disable parquet or raw persistence per run depending on your workflow.
+
+---
+
 ## 11. Evaluation & Trust
 
 * Offline backtesting with synthetic data

@@ -94,6 +94,7 @@ class ReadingSender:
         batch_size=25,
         flush_interval_s=0.2,
         max_queue_size=5000,
+        raw_data_file=None,
     ):
         self.ingest_batch_url = ingest_batch_url
         self.request_timeout_s = request_timeout_s
@@ -104,6 +105,7 @@ class ReadingSender:
         self.thread = threading.Thread(target=self._worker, daemon=True)
         self.sent_count = 0
         self.dropped_count = 0
+        self.raw_data_file = raw_data_file
 
     def start(self):
         self.thread.start()
@@ -121,8 +123,14 @@ class ReadingSender:
         self.thread.join(timeout=5)
 
     def _send_batch(self, batch):
+        headers = {}
+        if self.raw_data_file:
+            headers["X-Raw-Data-File"] = self.raw_data_file
         response = requests.post(
-            self.ingest_batch_url, json=batch, timeout=self.request_timeout_s
+            self.ingest_batch_url,
+            json=batch,
+            timeout=self.request_timeout_s,
+            headers=headers,
         )
         response.raise_for_status()
         self.sent_count += len(batch)
@@ -161,12 +169,14 @@ if __name__ == "__main__":
     flush_interval_s = float(os.getenv("LABMIND_BATCH_FLUSH_S", "0.2"))
     loop_duration = float(os.getenv("LABMIND_LOOP_DURATION_S", "5"))
     serial_baudrate = int(os.getenv("LABMIND_SERIAL_BAUD", "115200"))
+    raw_data_file = os.getenv("LABMIND_RAW_DATA_FILE", "").strip() or None
     arduino = ArduinoSerial(baudrate=serial_baudrate)
     sender = ReadingSender(
         ingest_batch_url=ingest_batch_url,
         request_timeout_s=request_timeout_s,
         batch_size=batch_size,
         flush_interval_s=flush_interval_s,
+        raw_data_file=raw_data_file,
     )
     try:
         sender.start()
