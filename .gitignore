@@ -211,3 +211,6 @@ __marimo__/
 
 # data directory
 data/
+
+# metaflow
+.metaflow
