@@ -1,388 +1,235 @@
-# LabMind — Full Project Specification
+# LabMind
+
+LabMind is a sensor-to-ML workflow project for running physical experiments (currently Arduino + ultrasonic sensor), capturing raw measurements, and producing reproducible analysis artifacts.
 
 ## 1. Overview
 
-**LabMind** is a production-grade ML engineering system that autonomously analyzes experimental sensor data from low-cost scientific setups (e.g., Arduino-based laboratories). The system is designed to support real-world, noisy experiments by combining reproducible ML pipelines, agent-based reasoning, physics constraints, and explicit human-in-the-loop checkpoints.
+LabMind combines:
 
-The project is intentionally aligned with the **ml.school** curriculum and tooling, emphasizing reproducibility, evaluation, trust, and correct separation between offline ML workflows and online services.
+- Online ingestion services (serial + API)
+- Offline orchestration with Metaflow
+- Raw immutable event capture (JSONL)
+- Analysis-ready snapshots (Parquet + DataFrame artifacts)
 
----
+The current implementation focus is the ingestion path and ingestion flow orchestration.
 
-## 2. Core Objectives
+## 2. Quickstart
 
-* Ingest and store raw sensor data from physical experiments
-* Detect and handle noise, anomalies, and experimental artifacts
-* Automatically select and fit physically meaningful models
-* Enforce physics-based constraints and interpretability
-* Generate structured scientific reports
-* Keep humans explicitly in control of key decisions
+### Prerequisites
 
----
+- Python `>=3.12`
+- [`uv`](https://docs.astral.sh/uv/)
+- [`just`](https://github.com/casey/just) (required on host for serial workflows)
+- Arduino connected over USB (for live ingestion)
 
-## 3. Technology Stack
+### Clone and install
 
-### Core Technologies
-
-* **Language:** Python 3.11
-* **Workflow Orchestration:** Metaflow
-* **Agent Framework:** Google ADK
-* **Experiment Tracking:** MLflow
-* **Dependency Management:** uv
-* **Containerization:** Docker
-* **Development Environment:** Devcontainers
-* **Serving Layer:** FastAPI
-* **Data Storage:** Parquet + Pandas
-* **Modeling:** NumPy, SciPy, scikit-learn
-* **Testing:** Pytest
-
----
-
-## 4. High-Level Architecture
-
-```
-Arduino Sensor
-     ↓
-Serial Ingestion Service
-     ↓
-Raw Data Store (Parquet)
-     ↓
-Metaflow Pipelines
-  ├─ Data Validation & Segmentation
-  ├─ Anomaly Detection
-  ├─ Model Selection & Fitting
-  ├─ Physics Validation
-  └─ Evaluation & Backtesting
-     ↓
-Model & Report Artifacts
-     ↓
-FastAPI Service
-     ↓
-Human Users (Dashboard / Reports)
+```bash
+git clone <your-repo-url>
+cd LabMind
+uv sync
 ```
 
----
+### Host vs devcontainer: where commands should run
 
-## 5. Data Model
+- **Devcontainer (recommended):** run API service and file-based flow runs.
+- **Host macOS/Linux:** run serial capture/live ingestion commands (USB serial access).
 
-### Canonical Schema
+### Fast start
 
-```
-timestamp | experiment_id | trial_id | sensor_id | value | unit
-```
-
-### Storage Layout
-
-```
-data/
-├── raw/
-├── validated/
-├── features/
-├── artifacts/
-├── reports/
-```
-
----
-
-## 6. Metaflow Pipelines
-
-### 6.1 ExperimentAnalysisFlow
-
-**Purpose:** End-to-end analysis of a single experimental trial.
-
-**Steps:**
-
-1. Load raw data snapshot
-2. Validate schema and units
-3. Segment time series into regimes
-4. Detect and mask anomalies
-5. Fit candidate models (parallel)
-6. Validate physical plausibility
-7. Select final model
-8. Generate interpretation and report
-
-All steps are reproducible, versioned, and replayable.
-
----
-
-### 6.2 ModelSelectionFlow
-
-**Purpose:** Compare multiple candidate models under identical conditions.
-
-**Candidate Models:**
-
-* Linear
-* Quadratic
-* Exponential
-* Sinusoidal
-
-**Metrics:**
-
-* RMSE
-* AIC / BIC
-* Residual structure
-* Physics constraint violations
-
-Results are logged to MLflow and stored as Metaflow artifacts.
-
----
-
-### 6.3 AnomalyBacktestFlow
-
-**Purpose:** Validate anomaly detection logic using synthetic and historical data.
-
-**Metrics:**
-
-* Precision / Recall
-* Detection latency
-* False positive rate
-
-Used in CI to prevent regressions.
-
----
-
-## 7. Agent System (Google ADK)
-
-Agents do not replace ML pipelines; they interpret, validate, explain, and assist decision-making.
-
-### Agent Roles
-
-1. **Data Monitor Agent**
-
-   * Validates incoming data
-   * Segments time series
-   * Detects anomalies
-
-2. **Model Analyst Agent**
-
-   * Interprets model fitting results
-   * Explains model selection decisions
-
-3. **Physics Validator Agent**
-
-   * Applies domain constraints (units, monotonicity, curvature)
-   * Rejects physically implausible models
-
-4. **Experiment Advisor Agent**
-
-   * Suggests improvements or repetitions
-   * Highlights data quality issues
-
-5. **Report Writer Agent**
-
-   * Produces structured scientific reports
-
----
-
-## 8. System Behavior Specification (Canonical Use Case)
-
-### Scenario: Free-Fall Experiment with Ultrasonic Distance Sensor
-
-An ultrasonic sensor measures the distance to an object that is initially held still, released into free fall, and eventually comes to rest.
-
-The raw signal contains:
-
-* Initial stationary readings
-* Noise and misreadings from hand placement
-* A quadratic distance-vs-time segment during free fall
-* Final stationary readings
-
----
-
-### Step-by-Step System Behavior
-
-#### Step 0 — Experiment Setup (Human-Controlled)
-
-* Human selects sensor and experiment type
-* Starts data acquisition
-* System assigns `experiment_id` and `trial_id`
-
-*No ML decisions occur at this stage.*
-
----
-
-#### Step 1 — Data Ingestion
-
-* Serial ingestion service records timestamped readings
-* Data is written verbatim to `data/raw/`
-
-*Data is immutable once recorded.*
-
----
-
-#### Step 2 — Analysis Trigger
-
-* Human explicitly triggers analysis (or ingestion completes)
-* `ExperimentAnalysisFlow` starts
-
----
-
-#### Step 3 — Segmentation & Validation
-
-**Agent:** Data Monitor Agent
-
-* Validates schema and units
-* Segments the signal into:
-
-  * Stationary (pre-release)
-  * Noisy transition (hand interference)
-  * Motion (free fall)
-  * Stationary (post-impact)
-
-**Human-in-the-loop checkpoint:**
-
-* UI displays segmentation
-* Human may adjust boundaries
-* Any adjustment triggers a new Metaflow run
-
----
-
-#### Step 4 — Anomaly Detection
-
-**Agent:** Data Monitor Agent
-
-* Flags outliers and implausible jumps
-* Anomalies are masked, not deleted
-
-**Optional human review** of anomaly mask
-
----
-
-#### Step 5 — Model Fitting
-
-**Agent:** Model Analyst Agent
-
-* Fits candidate models using only the motion segment
-* Runs in parallel via Metaflow `foreach`
-* Logs metrics and parameters to MLflow
-
----
-
-#### Step 6 — Physics Validation
-
-**Agent:** Physics Validator Agent
-
-* Evaluates curvature sign
-* Checks monotonicity
-* Ensures non-negative distances
-
-Physically invalid models are rejected.
-
----
-
-#### Step 7 — Model Selection
-
-**Agent:** Model Analyst Agent
-
-* Selects the simplest valid model with best performance
-* Produces explanation for acceptance and rejection
-
-**Human-in-the-loop checkpoint:**
-
-* Human may override model choice
-* Override is logged and versioned
-
----
-
-#### Step 8 — Interpretation
-
-**Agent:** Experiment Advisor Agent
-
-* Estimates acceleration
-* Compares to expected physical constants
-* Highlights experimental limitations
-
----
-
-#### Step 9 — Report Generation
-
-**Agent:** Report Writer Agent
-
-Produces a structured report containing:
-
-* Hypothesis
-* Method
-* Results
-* Interpretation
-* Limitations
-
----
-
-#### Step 10 — Review and Iteration
-
-* Human reviews report
-* Decides whether to repeat or refine experiment
-* Subsequent trials are linked via shared `experiment_id`
-
----
-
-## 9. Human-in-the-Loop Design Principles
-
-Humans are explicitly involved at:
-
-* Experiment definition
-* Segmentation validation
-* Model selection override
-* Final interpretation
-
-The system assists and explains; it never silently replaces human judgment.
-
----
-
-## 10. Repository Structure
-
-```
-labmind/
-├── src/
-│   └── agents/
-│   ├── api/
-│   ├── data/
-│   ├── evaluation/
-│   ├── flows/
-│   └── ingestion/
-├── tests/
-├── notebooks/
-├── .devcontainer/
-├── pyproject.toml
-├── uv.lock
-└──  README.md
-```
-
----
-
-## 10.1 Ingestion Implementation (Current)
-
-The current ingestion path has three components:
-
-1. **Ingestion API** (`/src/api/ingestion_api.py`)
-* Receives single readings (`POST /reading`) or batches (`POST /readings`).
-* Persists raw rows as JSONL.
-* Supports per-run target file override through header `X-Raw-Data-File`.
-
-2. **Serial Reader** (`/src/ingestion/serial_reader.py`)
-* Reads Arduino measurements from serial.
-* Sends readings in batches to ingestion API.
-* Can route writes to a specific raw file via env var `LABMIND_RAW_DATA_FILE`.
-
-3. **Metaflow Ingestion Flow** (`/src/flows/ingestion.py`)
-* `source_mode=live`: launches serial reader subprocess, validates data, builds dataframe.
-* `source_mode=file`: reads `jsonl/csv/parquet`, validates data, builds dataframe.
-* Optionally writes parquet and exposes flow artifacts for downstream flows.
-
-### Just Commands
-
-Start ingestion API service:
+1. Start ingestion API (usually in devcontainer):
 
 ```bash
 just ingestion-api
 ```
 
-Optional API overrides:
+2. Run live ingestion flow (usually on host):
 
 ```bash
-RAW_DATA_DIR=data/raw/custom INGESTION_API_PORT=8002 just ingestion-api
+just ingest-serial
 ```
 
-Run live ingestion flow (default behavior: keep raw JSONL and save parquet):
+## 3. Project Structure
+
+```text
+labmind/
+├── .devcontainer/
+├── data/                      # runtime data (gitignored)
+│   └── raw/
+├── notebooks/
+├── src/
+│   ├── api/
+│   │   ├── bridge.py
+│   │   └── ingestion_api.py
+│   ├── arduino/
+│   │   └── read_ultrasonic_sensor/
+│   │       └── read_ultrasonic_sensor.ino
+│   ├── flows/
+│   │   ├── contracts.py
+│   │   └── ingestion.py
+│   └── ingestion/
+│       └── serial_reader.py
+├── tests/
+│   ├── test_bridge_api.py
+│   └── test_ingestion_api.py
+├── Justfile
+├── pyproject.toml
+├── uv.lock
+└── README.md
+```
+
+## 4. Data Contracts and Storage
+
+### Raw ingestion row (JSONL)
+
+```json
+{"device_id":"HC-SR04","timestamp_ms":1234,"value":42.0}
+```
+
+Fields:
+
+- `device_id: str`
+- `timestamp_ms: int`
+- `value: float`
+
+### Canonical ingestion flow schema (DataFrame/Parquet)
+
+- `timestamp_ms`
+- `value`
+- `experiment_id`
+- `trial_id`
+- `sensor_id`
+- `unit`
+- `source`
+- `ingested_at`
+
+### Storage paths
+
+- Default raw JSONL (API default):
+  - `data/raw/readings.jsonl`
+- Run-scoped raw JSONL (live flow + `persist_raw_jsonl=true`):
+  - `data/raw/experiment_id=<id>/trial_id=<id>/sensor_id=<id>/date=<yyyy-mm-dd>/raw-<run_id>.jsonl`
+- Parquet snapshot (when `save_parquet=true`):
+  - `data/raw/experiment_id=<id>/trial_id=<id>/sensor_id=<id>/date=<yyyy-mm-dd>/part-<run_id>.parquet`
+- Temporary raw file (when `persist_raw_jsonl=false`, removed post-validation):
+  - `data/raw/.tmp/raw-<experiment_id>-<trial_id>-<run_id>.jsonl`
+
+## 5. Ingestion Services
+
+### Ingestion API (`src/api/ingestion_api.py`)
+
+Responsibilities:
+
+- Accept single reading: `POST /reading`
+- Accept batch readings: `POST /readings`
+- Persist rows to JSONL (append-only)
+
+Request contract:
+
+- Body for `POST /reading`: one reading object
+- Body for `POST /readings`: array of reading objects
+- Optional header: `X-Raw-Data-File` (override target JSONL path per request)
+
+Environment variables:
+
+- `RAW_DATA_DIR` (default `data/raw`)
+- `RAW_DATA_FILE` (default `data/raw/readings.jsonl`)
+
+### Serial Reader (`src/ingestion/serial_reader.py`)
+
+Responsibilities:
+
+- Connect to Arduino serial device
+- Parse `timestamp_ms,value` lines
+- Batch and send readings to ingestion API
+
+Key environment variables:
+
+- `LABMIND_INGEST_URL` (default `http://localhost:8002/reading`)
+- `LABMIND_INGEST_BATCH_URL` (default inferred to `/readings`)
+- `LABMIND_INGEST_TIMEOUT_S` (default `2`)
+- `LABMIND_BATCH_SIZE` (default `25`)
+- `LABMIND_BATCH_FLUSH_S` (default `0.2`)
+- `LABMIND_SERIAL_BAUD` (default `115200`)
+- `LABMIND_LOOP_DURATION_S` (default `5`)
+- `LABMIND_RAW_DATA_FILE` (optional custom JSONL target path via API header)
+
+## 6. Metaflow Ingestion Flow
+
+Flow module: `src/flows/ingestion.py`
+
+The `IngestionFlow` supports two modes:
+
+- `source_mode=live`: runs serial ingestion subprocess, then validates and transforms
+- `source_mode=file`: loads `jsonl|csv|parquet`, then validates and transforms
+
+### Core parameters
+
+- `source_mode`
+- `experiment_id`
+- `trial_id`
+- `sensor-id`
+- `unit`
+- `save-parquet`
+- `persist-raw-jsonl`
+- `raw-output-file`
+- `output-dir`
+- `strict-schema`
+
+### Live-mode parameters
+
+- `duration-s`
+- `serial-baud`
+- `serial-port`
+- `batch-size`
+- `batch-flush-s`
+- `ingest-url`
+
+### File-mode parameters
+
+- `input-file`
+- `input-format`
+
+### Output artifacts
+
+- `readings_df`
+- `row_count`
+- `dropped_row_count`
+- `data_start_ts_ms`
+- `data_end_ts_ms`
+- `output_parquet_path`
+- `ingestion_metadata`
+- `source_snapshot_path`
+
+### Validation behavior
+
+- If malformed rows exist and `strict-schema=true`: flow fails.
+- If malformed rows exist and `strict-schema=false`: malformed rows are dropped.
+- If no raw rows are loaded in live mode: failure includes diagnostics with serial subprocess output tail.
+
+## 7. End-to-End Workflows (Live and File)
+
+### Command matrix
+
+Start ingestion API:
+
+```bash
+just ingestion-api
+```
+
+Start ingestion API with custom storage/location:
+
+```bash
+RAW_DATA_DIR=data/raw/custom RAW_DATA_FILE=data/raw/custom/run.jsonl INGESTION_API_PORT=8002 just ingestion-api
+```
+
+Run serial capture only (no Metaflow flow):
+
+```bash
+just serial-capture
+```
+
+Run live ingestion flow (default toggles):
 
 ```bash
 just ingest-serial
@@ -406,53 +253,120 @@ Run live ingestion flow without raw JSONL and without parquet:
 PERSIST_RAW_JSONL=false SAVE_PARQUET=false just ingest-serial
 ```
 
-Run serial capture directly (without running Metaflow flow):
+Run live ingestion flow with advanced flags:
 
 ```bash
-just serial-capture
+just ingest-serial-flags "--duration-s" "10" "--serial-baud" "115200" "--raw-output-file" "data/raw/custom-live.jsonl"
 ```
 
-### Storage Behavior
+Run file-mode ingestion flow:
 
-Raw JSONL:
+```bash
+PYTHONPATH=src uv run python -m flows.ingestion run \
+  --source_mode file \
+  --input-file data/raw/readings.jsonl \
+  --input-format jsonl \
+  --experiment_id exp_001 \
+  --trial_id t01
+```
 
-* Default API file: `data/raw/readings.jsonl`
-* Run-specific file (flow live mode with `persist_raw_jsonl=true`):  
-  `data/raw/experiment_id=<id>/trial_id=<id>/sensor_id=<id>/date=<yyyy-mm-dd>/raw-<run_id>.jsonl`
-* If `persist_raw_jsonl=false`, flow writes to a temporary file in `data/raw/.tmp/` and removes it after validation.
+### Where are my parquet files?
 
-Parquet:
+Parquet is written only when `save-parquet=true`.
 
-* If `save_parquet=true`, parquet is written to:  
-  `data/raw/experiment_id=<id>/trial_id=<id>/sensor_id=<id>/date=<yyyy-mm-dd>/part-<run_id>.parquet`
-* If `save_parquet=false`, no parquet is written.
+At flow end, the run prints the resolved parquet path. By default, it is under:
 
-### Why Both JSONL and Parquet Exist
+- `data/raw/experiment_id=<id>/trial_id=<id>/sensor_id=<id>/date=<yyyy-mm-dd>/part-<run_id>.parquet`
 
-* JSONL is the immutable raw event stream from online capture.
-* Parquet is the validated, analysis-friendly snapshot produced by the flow.
-* You can disable parquet or raw persistence per run depending on your workflow.
+If `save-parquet=false`, no parquet file is written and `output_parquet_path=None`.
 
----
+## 8. Troubleshooting
 
-## 11. Evaluation & Trust
+### No rows acquired (`No raw rows loaded from snapshot...`)
 
-* Offline backtesting with synthetic data
-* Deterministic replay via Metaflow
-* Physics-based guardrails
-* CI failures on metric regressions
+Check:
 
----
+- Arduino is connected and readable on host
+- correct baud rate (current sketch uses `115200`)
+- ingestion API is running and reachable at configured URL
 
-## 12. Project Philosophy
+### API returns HTTP 500 in live mode
 
-LabMind is not an auto-grading system or a black-box AI. It is a **scientific assistant** that:
+Common cause: raw file path sent by host is not writable in API runtime context (e.g., host temp path while API runs in container).
 
-* Makes its reasoning explicit
-* Preserves raw data
-* Encourages learning from experimental imperfections
-* Reflects real ML engineering best practices
+Use project-local shared paths such as under `data/raw/...`.
 
----
+### `No valid rows after validation`
 
-*End of specification.*
+This means loaded rows were empty or invalid after schema checks.
+
+- Verify source file contents (`timestamp_ms`, `value` present and numeric)
+- If needed, run with `--strict-schema false` to drop malformed rows
+
+### Serial commands run inside devcontainer fail
+
+On macOS devcontainer setups, USB serial is typically host-only.
+
+- Run `just serial-capture` / `just ingest-serial` on host
+- Keep API running in devcontainer and exposed on `8002`
+
+## 9. Extended Architecture and Specification
+
+This section preserves the broader project direction. Items marked **Planned** are not fully implemented yet.
+
+### Core objectives
+
+- Ingest and store raw sensor data from physical experiments
+- Detect and handle noise/anomalies
+- Fit physically meaningful models
+- Enforce physics constraints and interpretability
+- Generate structured reports
+
+### High-level architecture (current + planned)
+
+```text
+Arduino Sensor
+     ↓
+Serial Ingestion Service (implemented)
+     ↓
+Ingestion API (implemented)
+     ↓
+Raw JSONL Store (implemented)
+     ↓
+Metaflow IngestionFlow (implemented)
+     ↓
+Validated Parquet Snapshot (implemented, optional)
+     ↓
+ExperimentAnalysisFlow / ModelSelectionFlow / AnomalyBacktestFlow (planned)
+     ↓
+Model & Report Artifacts (planned)
+     ↓
+FastAPI Serving Layer (partially planned)
+```
+
+### Technology stack
+
+- Language: Python `>=3.12`
+- Workflow orchestration: Metaflow
+- Serving layer: FastAPI
+- Data: Pandas + Parquet + JSONL
+- Dependencies: uv
+- Testing: pytest
+- Dev environment: devcontainer + host serial workflow
+
+### Human-in-the-loop principles
+
+Humans remain explicit decision points for:
+
+- experiment setup
+- segmentation/validation review
+- model selection overrides
+- interpretation review
+
+### Planned pipelines (not yet fully implemented)
+
+- `ExperimentAnalysisFlow`
+- `ModelSelectionFlow`
+- `AnomalyBacktestFlow`
+
+These are design targets and should be treated as roadmap items until code lands in `src/flows/`.
