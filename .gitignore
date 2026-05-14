@@ -214,3 +214,6 @@ data/
 
 # metaflow
 .metaflow
+
+# plans -- a directory where I keep implementation plans to follow
+.plans/
