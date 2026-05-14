@@ -22,3 +22,12 @@ serial-capture:
   LABMIND_SERIAL_BAUD="${LABMIND_SERIAL_BAUD:-115200}" \
   LABMIND_LOOP_DURATION_S="${LABMIND_LOOP_DURATION_S:-5}" \
   uv run python src/ingestion/serial_reader.py
+
+select-auto INPUT_PARQUET:
+  PYTHONPATH=src uv run python src/flows/data_selector.py run --input-parquet {{INPUT_PARQUET}} --auto-only true
+
+select-dry-run INPUT_PARQUET:
+  PYTHONPATH=src uv run python src/flows/data_selector.py run --input-parquet {{INPUT_PARQUET}} --dry-run true
+
+review-app:
+  PYTHONPATH=src uv run streamlit run src/review_app/selector_review.py
